@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SupplyGuard</title>
+<style>
+  :root { --bg:#0b1020; --panel:#121a2e; --line:#243152; --text:#e6ebf5; --muted:#8a96b3;
+          --crit:#ff4d6d; --high:#ff9f43; --med:#f7d154; --low:#4cc9f0; --ok:#3ddc97; --imm:#ff4d6d; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:18px 28px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:16px; }
+  header h1 { margin:0; font-size:20px; letter-spacing:.3px; }
+  header span { color:var(--muted); }
+  main { padding:24px 28px; display:grid; gap:18px; max-width:1300px; margin:0 auto; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; }
+  h2 { margin:0 0 12px; font-size:15px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  button, input { font:inherit; border-radius:7px; border:1px solid var(--line); background:#0e1528; color:var(--text); padding:9px 14px; }
+  button { cursor:pointer; background:#2a5bd7; border-color:#2a5bd7; font-weight:600; }
+  button.secondary { background:#0e1528; border-color:var(--line); font-weight:500; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:12px; }
+  .card { background:#0e1528; border:1px solid var(--line); border-radius:8px; padding:14px; }
+  .card .v { font-size:26px; font-weight:700; }
+  .card .l { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.6px; }
+  .banner { padding:12px 14px; border-radius:8px; border:1px solid; }
+  .banner.live { border-color:var(--ok); color:var(--ok); }
+  .banner.partial, .banner.unavailable, .banner.not-run { border-color:var(--high); color:var(--high); }
+  .banner.none { border-color:var(--line); color:var(--muted); }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.6px; }
+  tr.click { cursor:pointer; } tr.click:hover { background:#17213b; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; border:1px solid; }
+  .sev-CRITICAL { color:var(--crit); border-color:var(--crit);} .sev-HIGH { color:var(--high); border-color:var(--high);}
+  .sev-MEDIUM { color:var(--med); border-color:var(--med);} .sev-LOW { color:var(--low); border-color:var(--low);}
+  .sev-UNKNOWN, .sev-NONE { color:var(--muted); border-color:var(--line);}
+  .r-REACHABLE { color:var(--crit); border-color:var(--crit);} .r-NOT_REACHABLE { color:var(--ok); border-color:var(--ok);}
+  .r-UNKNOWN { color:var(--high); border-color:var(--high);}
+  .p-IMMEDIATE { background:var(--imm); color:#fff; border-color:var(--imm);} .p-HIGH { color:var(--high); border-color:var(--high);}
+  .p-MEDIUM { color:var(--med); border-color:var(--med);} .p-LOW { color:var(--muted); border-color:var(--line);}
+  .bar { height:8px; background:#0e1528; border-radius:4px; overflow:hidden; border:1px solid var(--line); }
+  .bar > div { height:100%; background:linear-gradient(90deg,#2a5bd7,#4cc9f0); }
+  .factor { display:grid; grid-template-columns: 1fr 120px 60px; gap:10px; align-items:center; padding:5px 0; }
+  .path { font-family: ui-monospace, Menlo, Consolas, monospace; background:#0e1528; border:1px solid var(--line); border-radius:8px; padding:10px; white-space:pre-wrap; }
+  .detail { display:grid; grid-template-columns: 1fr 1fr; gap:18px; }
+  @media (max-width: 900px) { .detail { grid-template-columns: 1fr; } }
+  .tree { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:12px; line-height:1.7; max-height:420px; overflow:auto; }
+  .muted { color:var(--muted); } .err { color:var(--crit); }
+  .ba { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .ba .card .v { font-size:22px; }
+  pre.cmd { background:#0e1528; border:1px solid var(--line); border-radius:6px; padding:8px; overflow:auto; margin:6px 0; }
+  input { min-width:200px; }
+</style>
+</head>
+<body>
+<header><h1>SupplyGuard</h1><span>From vulnerable dependency to verified remediation.</span></header>
+<main>
+
+<section class="panel">
+  <h2>1. Scan</h2>
+  <div class="row">
+    <label>SBOM or lockfile <input type="file" id="sbomFile" accept=".json,.txt,.toml"></label>
+    <button id="btnSbom">Scan SBOM</button>
+    <span class="muted">or</span>
+    <label>Repository (.zip) <input type="file" id="repoFile" accept=".zip"></label>
+    <button id="btnRepo">Scan repository</button>
+  </div>
+  <p class="muted" style="margin:10px 0 0">Repository scans enable reachability analysis. SBOM-only scans cannot determine reachability and will say so.</p>
+  <p id="scanStatus" class="muted"></p>
+</section>
+
+<section class="panel" id="statusPanel" hidden>
+  <h2>Vulnerability data</h2>
+  <div id="dataBanner" class="banner none"></div>
+</section>
+
+<section id="results" hidden style="display:grid; gap:18px;">
+  <section class="panel">
+    <h2>Security overview</h2>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Charts</h2>
+    <div class="detail">
+      <div><div class="muted" style="margin-bottom:8px">Vulnerabilities by severity</div><div id="chartSev"></div></div>
+      <div><div class="muted" style="margin-bottom:8px">Reachability of vulnerable packages</div><div id="chartReach"></div></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Prioritized vulnerabilities</h2>
+    <div style="overflow:auto"><table>
+      <thead><tr><th>Priority</th><th>Risk</th><th>Package</th><th>Version</th><th>CVE</th><th>CVSS</th><th>Severity</th><th>Reachability</th><th>Fixed</th></tr></thead>
+      <tbody id="findingRows"></tbody>
+    </table></div>
+    <p class="muted" id="noFindings" hidden>No vulnerabilities in the assessed packages.</p>
+  </section>
+
+  <section class="panel" id="detailPanel" hidden></section>
+
+  <section class="panel">
+    <h2>Dependency graph</h2>
+    <p class="muted" style="margin-top:0">Hierarchy from the application root. Vulnerable packages are marked.</p>
+    <div class="tree" id="tree"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Remediation plans</h2>
+    <div id="plans"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Limitations</h2>
+    <ul id="limits" class="muted"></ul>
+  </section>
+</section>
+
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let SCAN = null;   // { scan_id, report }
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.detail || `HTTP ${r.status}`);
+  return body;
+}
+function setStatus(msg, isErr) { const el = $("scanStatus"); el.textContent = msg; el.className = isErr ? "err" : "muted"; }
+
+async function runScan(kind) {
+  const input = kind === "sbom" ? $("sbomFile") : $("repoFile");
+  if (!input.files[0]) { setStatus("Choose a file first.", true); return; }
+  const fd = new FormData(); fd.append("file", input.files[0]);
+  setStatus(kind === "sbom" ? "Parsing SBOM and querying OSV.dev..." : "Extracting safely, parsing manifests, analysing source...");
+  for (const b of document.querySelectorAll("button")) b.disabled = true;
+  try {
+    SCAN = await api(kind === "sbom" ? "/api/scan/sbom" : "/api/scan/repository", { method: "POST", body: fd });
+    setStatus("Scan complete.");
+    render(SCAN.report, SCAN.scan_id);
+  } catch (e) { setStatus("Scan failed: " + e.message, true); }
+  finally { for (const b of document.querySelectorAll("button")) b.disabled = false; }
+}
+
+function bannerText(vd, report) {
+  const sources = vd.sources.length ? vd.sources.join(", ") : "none";
+  switch (vd.status) {
+    case "live": return ["live", `LIVE: all ${report.summary.total_components - (report.vulnerability_data.skipped_lookups||[]).length} lookups answered by OSV.dev. Sources: ${esc(sources)}.`];
+    case "partial": return ["partial", `PARTIAL: ${vd.failed_lookups.length} lookups failed (${esc(vd.failed_lookups[0]?.message||"")}). Those packages were NOT assessed.`];
+    case "unavailable": return ["unavailable", `UNAVAILABLE: OSV.dev could not be reached for any package. No vulnerability conclusion is made. ${esc(vd.failed_lookups[0]?.message||"")}`];
+    default: return ["not-run", "NOT RUN: no components with a known version to check."];
+  }
+}
+
+function render(r, scanId) {
+  $("results").hidden = false; $("statusPanel").hidden = false;
+  const [cls, text] = bannerText(r.vulnerability_data, r);
+  $("dataBanner").className = "banner " + cls; $("dataBanner").textContent = text +
+    (r.vulnerability_data.kev_status !== "live" ? " CISA KEV feed: " + r.vulnerability_data.kev_status + " (exploit status unknown)." : "");
+  const s = r.summary;
+  const score = s.security_score === null ? "Not assessed" : s.security_score + " / 100";
+  $("cards").innerHTML = [
+    ["Security score", score], ["SBOM quality", s.sbom_quality_score + " / 100"],
+    ["Components", s.total_components], ["Direct / transitive", `${s.direct_dependencies} / ${s.transitive_dependencies}`],
+    ["Vulnerabilities", s.vulnerabilities], ["Critical / High", `${s.critical} / ${s.high}`],
+    ["Reachable", s.reachable], ["Known exploited", s.known_exploited],
+    ["Fixable", s.fixable],
+  ].map(([l, v]) => `<div class="card"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div></div>`).join("");
+
+  renderCharts(r);
+  const rows = $("findingRows"); rows.innerHTML = "";
+  $("noFindings").hidden = r.findings.length > 0;
+  r.findings.forEach(f => {
+    const tr = document.createElement("tr"); tr.className = "click";
+    tr.innerHTML = `<td><span class="pill p-${f.priority}">${f.priority}</span></td><td><b>${f.risk_score}</b>${f.risk_capped ? ' <span class="muted">(capped)</span>' : ""}</td>
+      <td>${esc(f.name)}</td><td>${esc(f.version)}</td><td>${esc(f.cve || f.vuln_id)}</td><td>${f.cvss ?? "n/a"}</td>
+      <td><span class="pill sev-${f.severity}">${esc(f.severity)}</span></td>
+      <td><span class="pill r-${f.reachability}">${esc(f.reachability.replace("_"," "))}</span></td><td>${esc(f.fixed_version || "none")}</td>`;
+    tr.onclick = () => showDetail(f, r);
+    rows.appendChild(tr);
+  });
+  renderTree(r);
+  renderPlans(r, scanId);
+  $("limits").innerHTML = r.limitations.map(l => `<li>${esc(l)}</li>`).join("");
+  $("detailPanel").hidden = true;
+}
+
+function bars(items, colorFn) {
+  const max = Math.max(1, ...items.map(i => i.value));
+  return items.map(i => `<div class="factor" style="grid-template-columns:150px 1fr 40px"><span>${esc(i.label)}</span>
+    <div class="bar"><div style="width:${(i.value / max) * 100}%;${colorFn ? "background:" + colorFn(i) : ""}"></div></div><b>${i.value}</b></div>`).join("");
+}
+function renderCharts(r) {
+  const s = r.summary;
+  $("chartSev").innerHTML = bars([["CRITICAL", s.critical, "var(--crit)"], ["HIGH", s.high, "var(--high)"],
+    ["MEDIUM", s.medium, "var(--med)"], ["LOW", s.low, "var(--low)"]].map(([l, v]) => ({label: l, value: v})),
+    i => ({CRITICAL:"var(--crit)",HIGH:"var(--high)",MEDIUM:"var(--med)",LOW:"var(--low)"})[i.label]);
+  $("chartReach").innerHTML = bars([{label:"Reachable", value:s.reachable}, {label:"Unknown", value:s.unknown_reachability},
+    {label:"Not reachable", value:s.not_reachable}], i => ({Reachable:"var(--crit)",Unknown:"var(--high)","Not reachable":"var(--ok)"})[i.label]);
+}
+
+function showDetail(f, r) {
+  const p = $("detailPanel"); p.hidden = false;
+  const path = f.reachability_path.length ? f.reachability_path.join("\n  -> ") : "No import path found";
+  const factors = f.risk_factors.map(x => `<div class="factor"><span>${esc(x.label)} <span class="muted">(w ${x.weight})</span></span>
+    <div class="bar"><div style="width:${Math.min(100, x.contribution / 35 * 100)}%"></div></div><b>+${x.contribution}</b></div>`).join("");
+  p.innerHTML = `<h2>Vulnerability overview</h2>
+    <div class="cards" style="margin-bottom:14px">
+      <div class="card"><div class="l">CVE</div><div class="v" style="font-size:18px">${esc(f.cve || f.vuln_id)}</div></div>
+      <div class="card"><div class="l">Package</div><div class="v" style="font-size:18px">${esc(f.name)}</div></div>
+      <div class="card"><div class="l">Installed → fixed</div><div class="v" style="font-size:18px">${esc(f.version)} → ${esc(f.fixed_version || "none")}</div></div>
+      <div class="card"><div class="l">CVSS / severity</div><div class="v" style="font-size:18px">${f.cvss ?? "n/a"} ${esc(f.severity)}</div></div>
+      <div class="card"><div class="l">Risk</div><div class="v">${f.risk_score}</div></div>
+      <div class="card"><div class="l">Reachability</div><div class="v" style="font-size:16px">${esc(f.reachability)} (${f.reachability_confidence})</div></div>
+    </div>
+    <p>${esc(f.summary)}</p>
+    <div class="detail">
+      <div><h2>Why is this risky?</h2><div class="path">${esc(path)}</div>
+        <p class="muted">${esc(f.reachability_note)}</p></div>
+      <div><h2>Risk breakdown</h2>${factors}</div>
+    </div>
+    <h2 style="margin-top:14px">Recommended fix</h2>
+    <p>${f.fixed_version ? `Upgrade <b>${esc(f.name)} ${esc(f.version)} → ${esc(f.fixed_version)}</b>` : "No published fixed version."}</p>
+    <div class="row" id="prArea"></div>`;
+  if (f.fixed_version) {
+    $("prArea").innerHTML = `<input id="owner" placeholder="GitHub owner"><input id="repo" placeholder="repository">
+      <input id="base" placeholder="base branch (optional)" style="min-width:160px">
+      <button id="btnPr">Create remediation PR</button><span id="prStatus" class="muted"></span>`;
+    $("btnPr").onclick = () => createPR(f);
+  }
+  p.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function createPR(f) {
+  const body = { scan_id: SCAN.scan_id, finding_id: f.id, owner: $("owner").value.trim(), repo: $("repo").value.trim(), base_branch: $("base").value.trim() || null };
+  $("prStatus").textContent = "Regenerating lockfile, verifying against OSV.dev, opening PR...";
+  try {
+    const res = await api("/api/github/create-pr", { method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify(body) });
+    $("prStatus").innerHTML = `PR opened: <a href="${esc(res.pr.url)}" target="_blank" style="color:var(--low)">#${res.pr.number}</a>. Human approval required; not merged.`;
+    const b = res.before, a = res.after;
+    const reduction = b.vulnerabilities ? Math.round((1 - a.vulnerabilities / b.vulnerabilities) * 100) : 0;
+    $("prArea").insertAdjacentHTML("afterend", `<div class="ba" style="margin-top:14px">
+      <div class="card"><div class="l">Before</div><div>Vulnerabilities: <b>${b.vulnerabilities}</b> · Critical: <b>${b.critical}</b> · High: <b>${b.high}</b></div></div>
+      <div class="card"><div class="l">After (rescanned from the patched lockfile)</div><div>Vulnerabilities: <b>${a.vulnerabilities}</b> · Critical: <b>${a.critical}</b> · High: <b>${a.high}</b></div>
+      <div class="muted">Reduction: ${reduction}%</div></div></div>`);
+  } catch (e) { $("prStatus").textContent = "Not created: " + e.message; $("prStatus").className = "err"; }
+}
+
+function renderTree(r) {
+  const kids = {}; r.graph.edges.forEach(e => (kids[e.parent] ||= []).push(e.child));
+  const nodes = Object.fromEntries(r.graph.nodes.map(n => [n.id, n]));
+  const seen = new Set();
+  const label = (id) => {
+    const n = nodes[id]; if (!n) return esc(id);
+    const mark = n.vulnerabilities ? ` <span class="err">● ${n.vulnerabilities} vuln · ${esc(n.reachability)}</span>` : "";
+    return `${esc(n.name)}@${esc(n.version)} <span class="muted">${n.direct ? "direct" : "transitive"}, depth ${n.depth}</span>${mark}`;
+  };
+  const walk = (id, depth) => {
+    const list = (kids[id] || []).sort();
+    return list.map(c => {
+      const first = !seen.has(c); seen.add(c);
+      return `<div style="padding-left:${depth * 18}px">├ ${label(c)}${first ? "" : ' <span class="muted">(shown above)</span>'}</div>` +
+        (first && depth < 6 ? walk(c, depth + 1) : "");
+    }).join("");
+  };
+  $("tree").innerHTML = `<div><b>application</b></div>` + walk("__app__", 1);
+}
+
+function renderPlans(r, scanId) {
+  if (!r.remediations.length) { $("plans").innerHTML = `<p class="muted">No fixable packages in this scan.</p>`; return; }
+  $("plans").innerHTML = r.remediations.map(p => `<div class="card" style="margin-bottom:10px">
+    <b>${esc(p.name)}</b> ${esc(p.current_version)} → <b>${esc(p.target_version)}</b> <span class="muted">(${p.kind})</span>
+    <p class="muted" style="margin:6px 0">${esc(p.rationale)}</p>
+    <div>Command:<pre class="cmd">${esc(p.commands.join("\n"))}</pre></div>
+    <div class="muted">Files that will change: ${p.files_changed.map(esc).join(", ")}</div>
+    ${p.unfixable_findings.length ? `<div class="err">No fix published for: ${p.unfixable_findings.map(esc).join(", ")}</div>` : ""}
+  </div>`).join("");
+}
+
+$("btnSbom").onclick = () => runScan("sbom");
+$("btnRepo").onclick = () => runScan("repo");
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "supplyguard-demo-app",
+  "version": "1.0.0",
+  "description": "Deliberately vulnerable demo application for SupplyGuard. Do not deploy.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "axios": "0.21.1",
+    "express": "4.17.1",
+    "lodash": "4.17.15",
+    "uuid": "9.0.1"
+  }
+}
