@@ -100,19 +100,5 @@ docs/               judge walkthrough
 scripts/            preflight checks
 ```
 
-## run
 
-```
-python -m pip install -r backend\requirements.txt
-```
-#backend
-
-```
-cd backend
-python -m uvicorn app.api:app --host 127.0.0.1 --port 8000
-```
-#frontend
-```
-cd frontend
-.\index.html
 ```
